@@ -13,6 +13,7 @@ export default function Chat() {
   const [newUser, setNewUser] = useState('');
   const [groupName, setGroupName] = useState('');
   const [convKey, setConvKey] = useState<CryptoKey | null>(null);
+  const [online, setOnline] = useState(navigator.onLine);
 
   useEffect(() => {
     (async () => {
@@ -26,6 +27,14 @@ export default function Chat() {
       }
       api.get('/conversations').then((r) => setConversations(r.data));
     })();
+  }, []);
+
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
   useEffect(() => {
@@ -148,6 +157,7 @@ export default function Chat() {
           </button>
         ))}
       </aside>
+      {!online && <div className="bg-yellow-200 text-yellow-900 text-sm px-3 py-1">You are offline. Messages will queue.</div>}
       <main className="flex-1 flex flex-col">
         <div className="flex-1 overflow-auto p-4 space-y-2">
           {messages.map((m) => (

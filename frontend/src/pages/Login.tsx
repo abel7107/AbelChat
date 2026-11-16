@@ -25,8 +25,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-3">
         <h1 className="text-2xl font-bold">Login</h1>
-        <input placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border rounded px-3 py-2" />
-        <input type="password" placeholder="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border rounded px-3 py-2" />
+        <input placeholder="email" aria-label="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border rounded px-3 py-2" />
+        <input type="password" placeholder="password" aria-label="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border rounded px-3 py-2" />
         <button className="w-full bg-blue-600 text-white py-2 rounded">Login</button>
         {msg && <p className="text-sm">{msg}</p>}
         <div className="flex gap-3 text-sm">
