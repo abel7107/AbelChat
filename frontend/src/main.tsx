@@ -12,6 +12,7 @@ import Privacy from './pages/Privacy';
 import Admin from './pages/Admin';
 import Call from './pages/Call';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
 
 function Guard({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/admin" element={<Guard><Admin /></Guard>} />
           <Route path="/call" element={<Guard><Call /></Guard>} />
           <Route path="/settings" element={<Guard><Settings /></Guard>} />
+          <Route path="/profile" element={<Guard><Profile /></Guard>} />
           <Route path="/notifications" element={<Guard><Notifications /></Guard>} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>

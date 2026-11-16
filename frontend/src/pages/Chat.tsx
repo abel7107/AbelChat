@@ -13,6 +13,10 @@ export default function Chat() {
   const [newUser, setNewUser] = useState('');
   const [groupName, setGroupName] = useState('');
   const [convKey, setConvKey] = useState<CryptoKey | null>(null);
+  const [activeConv, setActiveConv] = useState<any>(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [expiry, setExpiry] = useState('never');
   const [online, setOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -42,6 +46,11 @@ export default function Chat() {
     setConvKey(null);
     (async () => {
       const { data: conv } = await api.get(`/conversations/${active}`);
+      setActiveConv(conv);
+      if (conv.type === 'GROUP') {
+        const m = await api.get(`/groups/${active}/members`);
+        setGroupMembers(m.data);
+      } else { setGroupMembers([]); }
       let key: CryptoKey | null = null;
       const other = conv.members.find((m: any) => m.userId !== userId);
       if (other) {
@@ -88,12 +97,33 @@ export default function Chat() {
     socket.disconnect();
   }
 
+  async function shareContact() {
+    const name = prompt('Contact name');
+    const phone = prompt('Phone');
+    if (!active || !name) return;
+    const content = JSON.stringify({ name, phone });
+    const { data: msg } = await api.post(`/messages/conversation/${active}`, { content, type: 'CONTACT' });
+    setMessages((prev) => [...prev, msg]);
+  }
+  async function shareLocation() {
+    if (!active) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const content = JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      const { data: msg } = await api.post(`/messages/conversation/${active}`, { content, type: 'LOCATION' });
+      setMessages((prev) => [...prev, msg]);
+    });
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!active || !text.trim()) return;
     let content = text;
     if (convKey) content = await encryptText(text, convKey);
-    const { data } = await api.post(`/messages/conversation/${active}`, { content });
+    let expiresAt = null;
+    if (expiry === '24h') expiresAt = new Date(Date.now() + 24*3600*1000).toISOString();
+    if (expiry === '7d') expiresAt = new Date(Date.now() + 7*24*3600*1000).toISOString();
+    if (expiry === '30d') expiresAt = new Date(Date.now() + 30*24*3600*1000).toISOString();
+    const { data } = await api.post(`/messages/conversation/${active}`, { content, expiresAt });
     setMessages((prev) => [...prev, { ...data, content: text }]);
     const socket = io({ auth: { token } });
     socket.emit('message', { ...data, conversationId: active });
@@ -127,6 +157,15 @@ export default function Chat() {
     setNewUser('');
   }
 
+  function formatSpecial(m: any) {
+    try {
+      const d = JSON.parse(m.content);
+      if (m.type === 'CONTACT') return `Contact: ${d.name} (${d.phone})`;
+      if (m.type === 'LOCATION') return `Location: ${d.lat}, ${d.lng}`;
+    } catch {}
+    return m.content;
+  }
+
   return (
     <div className="h-screen flex">
       <aside className="w-64 border-r p-3 space-y-2 overflow-auto">
@@ -138,6 +177,7 @@ export default function Chat() {
             <a href="/admin" className="text-blue-600">Admin</a>
             <a href="/call" className="text-blue-600">Call</a>
             <a href="/settings" className="text-blue-600">Settings</a>
+            <a href="/profile" className="text-blue-600">Profile</a>
             <a href="/notifications" className="text-blue-600">Notifs</a>
             <button onClick={logout} className="text-red-600">Logout</button>
           </div>
@@ -159,20 +199,56 @@ export default function Chat() {
       </aside>
       {!online && <div className="bg-yellow-200 text-yellow-900 text-sm px-3 py-1">You are offline. Messages will queue.</div>}
       <main className="flex-1 flex flex-col">
+        {activeConv?.type === 'GROUP' && (
+          <div className="border-b px-4 py-2 flex items-center justify-between">
+            <span className="font-medium">{activeConv.name}</span>
+            <button onClick={() => setShowGroupInfo(!showGroupInfo)} className="text-sm text-blue-600">Group info</button>
+          </div>
+        )}
+        {showGroupInfo && activeConv?.type === 'GROUP' && (
+          <div className="border-b p-4 space-y-2 bg-gray-50">
+            <div className="flex gap-2">
+              <input id="addMember" placeholder="username to add" className="border rounded px-2 py-1 text-sm flex-1" />
+              <button onClick={async () => {
+                const input = document.getElementById('addMember') as HTMLInputElement;
+                const { data: users } = await api.get('/users/search', { params: { q: input.value } });
+                if (users.length) { await api.post(`/conversations/${active}/members`, { userId: users[0].id }); const m = await api.get(`/groups/${active}/members`); setGroupMembers(m.data); input.value=''; }
+              }} className="text-sm bg-blue-600 text-white px-2 rounded">Add</button>
+            </div>
+            {groupMembers.map((m: any) => (
+              <div key={m.id} className="flex items-center justify-between text-sm">
+                <span>{m.userId} ({m.role})</span>
+                <div className="flex gap-1">
+                  {m.role !== 'ADMIN' && <button onClick={async () => { await api.post(`/groups/${active}/admins`, { userId: m.userId }); const mm = await api.get(`/groups/${active}/members`); setGroupMembers(mm.data); }} className="text-xs text-blue-600">Make admin</button>}
+                  <button onClick={async () => { await api.delete(`/groups/${active}/members/${m.userId}`); const mm = await api.get(`/groups/${active}/members`); setGroupMembers(mm.data); }} className="text-xs text-red-600">Remove</button>
+                </div>
+              </div>
+            ))}
+            <button onClick={async () => { await api.post(`/groups/${active}/leave`); setActive(null); setShowGroupInfo(false); }} className="text-xs text-red-600">Leave group</button>
+          </div>
+        )}
         <div className="flex-1 overflow-auto p-4 space-y-2">
           {messages.map((m) => (
             <div key={m.id} className={`max-w-xs px-3 py-2 rounded ${m.senderId === userId ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-200'}`}>
-              {m.deletedForEveryone ? 'deleted' : m.content}
+              {m.deletedForEveryone ? 'deleted' : (m.type === 'CONTACT' || m.type === 'LOCATION' ? formatSpecial(m) : m.content)}
             </div>
           ))}
         </div>
         {active && (
           <form onSubmit={send} className="border-t p-3 flex gap-2">
-            <input value={text} onChange={(e) => setText(e.target.value)} className="flex-1 border rounded px-3 py-2" placeholder="message" aria-label="message input" />
+            <select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="border rounded px-2 py-2 text-sm" aria-label="disappearing duration">
+            <option value="never">Never</option>
+            <option value="24h">24h</option>
+            <option value="7d">7d</option>
+            <option value="30d">30d</option>
+          </select>
+          <input value={text} onChange={(e) => setText(e.target.value)} className="flex-1 border rounded px-3 py-2" placeholder="message" aria-label="message input" />
             <label className="bg-gray-200 px-3 py-2 rounded cursor-pointer">
               📎
               <input type="file" className="hidden" onChange={uploadFile} />
             </label>
+            <button type="button" onClick={shareContact} className="bg-gray-200 px-2 rounded" aria-label="share contact">👤</button>
+            <button type="button" onClick={shareLocation} className="bg-gray-200 px-2 rounded" aria-label="share location">📍</button>
             <button className="bg-blue-600 text-white px-4 rounded">Send</button>
           </form>
         )}
