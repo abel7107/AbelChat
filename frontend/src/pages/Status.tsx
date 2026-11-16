@@ -22,9 +22,10 @@ export default function Status() {
         <button onClick={publish} className="bg-blue-600 text-white px-4 rounded">Publish</button>
       </div>
       {statuses.map((s) => (
-        <div key={s.id} className="border rounded p-3">
+        <div key={s.id} className="border rounded p-3" onClick={() => api.post(`/status/${s.id}/view`)}>
           <div className="text-sm text-gray-500">{s.userId}</div>
           <div>{s.content}</div>
+          <div className="text-xs text-gray-400">views: {s.views?.length ?? 0}</div>
         </div>
       ))}
     </div>
