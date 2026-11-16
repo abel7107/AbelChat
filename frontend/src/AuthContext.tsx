@@ -17,7 +17,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
-  }, [token]);
+    if (userId) {
+      api.get(`/users/${userId}`).then((r) => {
+        const theme = r.data.profile?.theme;
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }).catch(() => {});
+    }
+  }, [token, userId]);
 
   function login(t: string, u: string) {
     setToken(t);
