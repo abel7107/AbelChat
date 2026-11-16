@@ -1,0 +1,45 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import authRoutes from './modules/auth/auth.routes';
+import conversationRoutes from './modules/conversations/conversations.routes';
+import messageRoutes from './modules/messages/messages.routes';
+import userRoutes from './modules/users/users.routes';
+import mediaRoutes from './modules/media/media.routes';
+import statusRoutes from './modules/status/status.routes';
+import privacyRoutes from './modules/privacy/privacy.routes';
+import notificationRoutes from './modules/notifications/notifications.routes';
+import adminRoutes from './modules/admin/admin.routes';
+import deviceRoutes from './modules/devices/devices.routes';
+import callRoutes from './modules/calls/calls.routes';
+import groupRoutes from './modules/groups/groups.routes';
+
+export function createApp() {
+  const app = express();
+  app.use(helmet());
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(morgan('dev'));
+  app.use(express.json());
+  app.use(cookieParser());
+  const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+  app.use('/api/auth', authLimiter, authRoutes);
+  app.use('/api/conversations', conversationRoutes);
+  app.use('/api/messages', messageRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/media', mediaRoutes);
+  app.use('/api/status', statusRoutes);
+  app.use('/api/privacy', privacyRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/devices', deviceRoutes);
+  app.use('/api/calls', callRoutes);
+  app.use('/api/groups', groupRoutes);
+  app.use('/uploads', express.static('uploads'));
+  app.get('/health', (_req, res) => res.json({ ok: true }));
+  app.use((_req, res) => res.status(404).json({ error: 'not found' }));
+  app.use((err: any, _req: any, res: any, _next: any) => { console.error(err); res.status(500).json({ error: 'internal error' }); });
+  return app;
+}
