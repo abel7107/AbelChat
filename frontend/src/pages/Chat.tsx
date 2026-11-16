@@ -54,6 +54,7 @@ export default function Chat() {
     })();
     const socket = io({ auth: { token } });
     socket.emit('join', active);
+    socket.on('connect', () => { api.get(`/messages/conversation/${active}`).then((r) => setMessages(r.data)); });
     socket.on('message', async (m: any) => {
       if (m.conversationId !== active) return;
       const key = convKey; if (key && m.content && !m.deletedForEveryone) {

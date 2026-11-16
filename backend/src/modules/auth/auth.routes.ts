@@ -84,6 +84,7 @@ router.post('/login', async (req, res) => {
   }
   const token = jwt.sign({ sub: user.id }, env.jwtSecret, { expiresIn: '7d' });
   await prisma.authSession.create({ data: { userId: user.id, refreshTokenHash: hashToken(token), expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000) } });
+  await prisma.notification.create({ data: { userId: user.id, type: 'SYSTEM', title: 'New login', body: 'A new login to your account was detected.' } });
   res.json({ token, userId: user.id });
 });
 
@@ -197,6 +198,27 @@ router.post('/password-reset/confirm', async (req, res) => {
   await prisma.verificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
   const passwordHash = await hashPassword(newPassword);
   await prisma.user.update({ where: { id: record.userId }, data: { passwordHash } });
+  res.json({ ok: true });
+});
+
+router.post('/password-reset/phone/request', async (req, res) => {
+  const { phoneNumber } = req.body || {};
+  const user = await prisma.user.findUnique({ where: { phoneNumber } });
+  if (!user) return res.json({ ok: true });
+  const otp = (await import('../../shared/crypto')).generateOtp();
+  await prisma.otpCode.create({ data: { userId: user.id, phoneNumber, codeHash: (await import('../../shared/crypto')).hashToken(otp), purpose: 'PASSWORD_RECOVERY', expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
+  res.json({ otp });
+});
+
+router.post('/password-reset/phone/confirm', async (req, res) => {
+  const { phoneNumber, code, newPassword } = req.body || {};
+  const record = await prisma.otpCode.findFirst({ where: { phoneNumber, purpose: 'PASSWORD_RECOVERY' }, orderBy: { createdAt: 'desc' } });
+  if (!record || record.usedAt || record.expiresAt < new Date()) return res.status(400).json({ error: 'invalid or expired otp' });
+  const { hashToken, hashPassword } = await import('../../shared/crypto');
+  if (record.codeHash !== hashToken(code)) return res.status(400).json({ error: 'incorrect otp' });
+  await prisma.otpCode.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({ where: { id: record.userId! }, data: { passwordHash } });
   res.json({ ok: true });
 });
 

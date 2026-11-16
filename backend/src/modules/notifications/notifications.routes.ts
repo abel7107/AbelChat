@@ -25,4 +25,15 @@ router.put('/preferences', requireAuth, async (req: AuthRequest, res) => {
   res.json(p);
 });
 
+router.post('/push/subscribe', requireAuth, async (req: AuthRequest, res) => {
+  const { endpoint, p256dh, auth } = req.body || {};
+  const sub = await prisma.pushSubscription.create({ data: { userId: req.userId!, endpoint, p256dh, auth } });
+  res.status(201).json(sub);
+});
+
+router.get('/push/subscriptions', requireAuth, async (req: AuthRequest, res) => {
+  const subs = await prisma.pushSubscription.findMany({ where: { userId: req.userId! } });
+  res.json(subs);
+});
+
 export default router;
