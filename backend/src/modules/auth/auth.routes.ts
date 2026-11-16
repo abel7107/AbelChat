@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword, generateToken, hashToken, generateOtp } f
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
+import { sendPushToUser } from '../../lib/push';
 import { generateSecret, verifyTotp } from '../../shared/totp';
 
 const router = Router();
@@ -83,8 +84,12 @@ router.post('/login', async (req, res) => {
     return res.json({ requires2fa: true, userId: user.id });
   }
   const token = jwt.sign({ sub: user.id }, env.jwtSecret, { expiresIn: '7d' });
-  await prisma.authSession.create({ data: { userId: user.id, refreshTokenHash: hashToken(token), expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000) } });
-  await prisma.notification.create({ data: { userId: user.id, type: 'SYSTEM', title: 'New login', body: 'A new login to your account was detected.' } });
+  const prior = await prisma.authSession.findFirst({ where: { userId: user.id, userAgent: req.headers['user-agent'] || null } });
+  await prisma.authSession.create({ data: { userId: user.id, refreshTokenHash: hashToken(token), ipAddress: req.ip, userAgent: req.headers['user-agent'] || null, expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000) } });
+  if (!prior) {
+    await prisma.notification.create({ data: { userId: user.id, type: 'SYSTEM', title: 'New device login', body: 'A login from a new device or browser was detected.' } });
+    sendPushToUser(user.id, { title: 'New device login', body: 'A login from a new device or browser was detected.' });
+  }
   res.json({ token, userId: user.id });
 });
 

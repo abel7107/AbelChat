@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
+import { vapidPublicKey, sendPushToUser } from '../../lib/push';
 import { requireAuth, AuthRequest } from '../../middleware/auth';
 
 const router = Router();
@@ -34,6 +35,10 @@ router.post('/push/subscribe', requireAuth, async (req: AuthRequest, res) => {
 router.get('/push/subscriptions', requireAuth, async (req: AuthRequest, res) => {
   const subs = await prisma.pushSubscription.findMany({ where: { userId: req.userId! } });
   res.json(subs);
+});
+
+router.get('/vapid-public-key', (_req, res) => {
+  res.json({ publicKey: vapidPublicKey });
 });
 
 export default router;
