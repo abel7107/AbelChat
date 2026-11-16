@@ -275,6 +275,7 @@ model ConversationMember {
 
   @@unique([conversationId, userId])
   @@index([userId])
+  @@index([conversationId, userId])
   @@map("conversation_members")
 }
 
@@ -304,6 +305,7 @@ model Message {
   attachments    MessageAttachment[]
 
   @@index([conversationId, createdAt])
+  @@index([senderId])
   @@map("messages")
 }
 
@@ -527,6 +529,7 @@ model Notification {
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([userId, readAt])
   @@map("notifications")
 }
 
