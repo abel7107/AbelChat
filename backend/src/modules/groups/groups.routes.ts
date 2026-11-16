@@ -42,4 +42,18 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
   res.json(updated);
 });
 
+router.post('/:id/key-packages', requireAuth, async (req: AuthRequest, res) => {
+  const { packages } = req.body || {};
+  for (const pk of packages || []) {
+    await prisma.groupKeyPackage.create({ data: { conversationId: String(req.params.id), userId: pk.userId, packageData: pk.packageData } });
+  }
+  res.status(201).json({ ok: true });
+});
+
+router.get('/:id/key-package', requireAuth, async (req: AuthRequest, res) => {
+  const pkg = await prisma.groupKeyPackage.findFirst({ where: { conversationId: String(req.params.id), userId: req.userId! } });
+  if (!pkg) return res.status(404).json({ error: 'not found' });
+  res.json(pkg);
+});
+
 export default router;
